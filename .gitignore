@@ -1,3 +1,6 @@
 pysaj.egg-info
 build
 dist
+.vscode
+pysaj/__pycache__
+pysaj/.vscode
