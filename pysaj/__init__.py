@@ -1,6 +1,7 @@
 """PySAJ interacts as a library to communicate with SAJ inverters"""
 import aiohttp
 import asyncio
+import concurrent
 from datetime import date
 import logging
 import xml.etree.ElementTree as ET
@@ -95,7 +96,8 @@ class SAJ(object):
         """Returns necessary sensors from SAJ inverter"""
 
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get("http://%s/real_time_data.xml" %
                                        self.host) as xmlfile:
                     data = await xmlfile.text()
@@ -111,7 +113,8 @@ class SAJ(object):
                                       sen.name, sen.value)
 
                     return True
-        except aiohttp.client_exceptions.ClientConnectorError:
+        except (aiohttp.client_exceptions.ClientConnectorError,
+                concurrent.futures._base.TimeoutError):
             # Connection to inverter not possible.
             # This can be "normal" - so warning instead of error - as SAJ
             # inverters are powered by DC and thus have no power after the sun
