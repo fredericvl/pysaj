@@ -42,7 +42,7 @@ class Sensor(object):
 class Sensors(object):
     """SAJ sensors"""
 
-    def __init__(self):
+    def __init__(self, wifi=False):
         self.__s = []
         self.add(
             (
@@ -50,7 +50,6 @@ class Sensors(object):
                 Sensor("e-today", 3, 3, "/100", "today_yield", "kWh", True),
                 Sensor("e-total", 1, 1, "/100", "total_yield", "kWh", False,
                        True),
-                Sensor("maxPower", -1, -1, "", "today_max_current", "W", True),
                 Sensor("t-today", 4, 4, "/10", "today_time", "h", True),
                 Sensor("t-total", 2, 2, "/10", "total_time", "h", False, True),
                 Sensor("CO2", 21, 33, "/10", "total_co2_reduced", "kg", False,
@@ -59,6 +58,10 @@ class Sensors(object):
                 Sensor("state", 22, 34, "", "state")
             )
         )
+        if not wifi:
+            self.add(
+                Sensor("maxPower", -1, -1, "", "today_max_current", "W", True)
+            )
 
     def __len__(self):
         """Length."""
@@ -147,12 +150,12 @@ class SAJ(object):
 
                         for sen in sensors:
                             if ncol < 24:
-                                if sen.csv_1_key != 1:
+                                if sen.csv_1_key != -1:
                                     v = values[sen.csv_1_key]
                                 else:
                                     v = None
                             else:
-                                if sen.csv_2_key != 1:
+                                if sen.csv_2_key != -1:
                                     v = values[sen.csv_2_key]
                                 else:
                                     v = None
