@@ -116,24 +116,25 @@ class SAJ(object):
         self.username = username
         self.password = password
 
-    async def read(self, sensors):
-        """Returns necessary sensors from SAJ inverter"""
-
-        url = "http://{0}/".format(self.host)
+        self.url = "http://{0}/".format(self.host)
         if self.wifi:
             if (len(self.username) > 0
                and len(self.password) > 0):
-                url = "http://{0}:{1}@{2}/".format(self.username,
-                                                   self.password,
-                                                   self.host)
-                url += URL_PATH_WIFI
+                self.url = "http://{0}:{1}@{2}/".format(self.username,
+                                                        self.password,
+                                                        self.host)
+                self.url += URL_PATH_WIFI
         else:
-            url += URL_PATH_ETHERNET
+            self.url += URL_PATH_ETHERNET
+
+    async def read(self, sensors):
+        """Returns necessary sensors from SAJ inverter"""
 
         try:
             timeout = aiohttp.ClientTimeout(total=5)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as response:
+            async with aiohttp.ClientSession(timeout=timeout,
+                                             raise_for_status=True) as session:
+                async with session.get(self.url) as response:
                     data = await response.text()
 
                     if self.wifi:
@@ -191,19 +192,42 @@ class SAJ(object):
                             "The inverter may be offline due to darkness. " +
                             "Otherwise check host/ip address.")
             return False
+        except aiohttp.client_exceptions.ClientResponseError as err:
+            # 401 Unauthorized: wrong username/password
+            if err.status == 401:
+                raise UnauthorizedException(err)
+            else:
+                raise UnexpectedResponseException(err)
         except ET.ParseError:
             # XML is not valid or even no XML at all
-            _LOGGER.error("No valid XML received from %s", self.host)
-            return False
+            raise UnexpectedResponseException(
+                str.format("No valid XML received from {0}", self.host)
+            )
         except KeyError:
             # XML received does not have all the required elements
-            _LOGGER.error("SAJ sensor key %s not found, inverter not " +
-                          "compatible?", sen.key)
-            return False
+            raise UnexpectedResponseException(
+                str.format("SAJ sensor key {0} not found, inverter not " +
+                           "compatible?", sen.key)
+            )
         except IndexError:
             # CSV received does not have all the required elements
-            _LOGGER.error("SAJ sensor name %s at CSV position %s not found, " +
-                          "inverter not compatible?",
-                          sen.name,
-                          sen.csv_1_key if ncol < 24 else sen.csv_2_key)
-            return False
+            raise UnexpectedResponseException(
+                str.format(
+                    "SAJ sensor name {0} at CSV position {1} not found, " +
+                    "inverter not compatible?",
+                    sen.name,
+                    sen.csv_1_key if ncol < 24 else sen.csv_2_key
+                )
+            )
+
+
+class UnauthorizedException(Exception):
+    """Exception for Unauthorized 401 status code"""
+    def __init__(self, message):
+        Exception.__init__(self, message)
+
+
+class UnexpectedResponseException(Exception):
+    """Exception for unexpected status code"""
+    def __init__(self, message):
+        Exception.__init__(self, message)
