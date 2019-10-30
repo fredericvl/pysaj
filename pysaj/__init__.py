@@ -168,6 +168,7 @@ class SAJ(object):
                                     sen.value = eval(
                                         "{0}{1}".format(v, sen.factor)
                                     )
+                                sen.date = date.today()
                     else:
                         xml = ET.fromstring(data)
 
@@ -176,8 +177,8 @@ class SAJ(object):
                             if find is None:
                                 raise KeyError
                             sen.value = find.text
+                            sen.date = date.today()
 
-                    sen.date = date.today()
                     _LOGGER.debug("Got new value for sensor %s: %s",
                                   sen.name, sen.value)
 
