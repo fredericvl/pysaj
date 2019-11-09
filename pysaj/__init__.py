@@ -19,7 +19,9 @@ MAPPER_STATES = {
 }
 
 URL_PATH_ETHERNET = "real_time_data.xml"
+URL_PATH_ETHERNET_INFO = "equipment_data.xml"
 URL_PATH_WIFI = "status/status.php"
+URL_PATH_WIFI_INFO = "info.php"
 
 
 class Sensor(object):
@@ -115,6 +117,7 @@ class SAJ(object):
         self.wifi = wifi
         self.username = username
         self.password = password
+        self.serialnumber = "XXXXXXXXXXXXXXXXX"
 
         self.url = "http://{0}/".format(self.host)
         if self.wifi:
@@ -123,8 +126,10 @@ class SAJ(object):
                 self.url = "http://{0}:{1}@{2}/".format(self.username,
                                                         self.password,
                                                         self.host)
+                self.url_info = self.url + URL_PATH_WIFI_INFO
                 self.url += URL_PATH_WIFI
         else:
+            self.url_info = self.url + URL_PATH_ETHERNET_INFO
             self.url += URL_PATH_ETHERNET
 
     async def read(self, sensors):
@@ -134,7 +139,27 @@ class SAJ(object):
             timeout = aiohttp.ClientTimeout(total=5)
             async with aiohttp.ClientSession(timeout=timeout,
                                              raise_for_status=True) as session:
-                async with session.get(self.url) as response:
+                current_url = self.url_info
+                async with session.get(current_url) as response:
+                    data = await response.text()
+
+                    if self.wifi:
+                        csv_data = StringIO(data)
+                        reader = csv.reader(csv_data)
+
+                        for row in reader:
+                            self.serialnumber = row.pop(0)
+                    else:
+                        xml = ET.fromstring(data)
+
+                        find = xml.find("SN")
+                        if find is not None:
+                            self.serialnumber = find.text
+
+                    _LOGGER.debug("Inverter SN: %s", self.serialnumber)
+
+                current_url = self.url
+                async with session.get(current_url) as response:
                     data = await response.text()
 
                     if self.wifi:
@@ -199,10 +224,17 @@ class SAJ(object):
                 raise UnauthorizedException(err)
             else:
                 raise UnexpectedResponseException(err)
+        except csv.Error:
+            # CSV is not valid
+            raise UnexpectedResponseException(
+                str.format("No valid CSV received from {0} at {1}", self.host,
+                           current_url)
+            )
         except ET.ParseError:
             # XML is not valid or even no XML at all
             raise UnexpectedResponseException(
-                str.format("No valid XML received from {0}", self.host)
+                str.format("No valid XML received from {0} at {1}", self.host,
+                           current_url)
             )
         except KeyError:
             # XML received does not have all the required elements
