@@ -39,6 +39,7 @@ class Sensor(object):
         self.per_day_basis = per_day_basis
         self.per_total_basis = per_total_basis
         self.date = date.today()
+        self.enabled = False
 
 
 class Sensors(object):
@@ -57,13 +58,10 @@ class Sensors(object):
                 Sensor("CO2", 21, 33, "/10", "total_co2_reduced", "kg", False,
                        True),
                 Sensor("temp", 20, 32, "/10", "temperature", "°C"),
-                Sensor("state", 22, 34, "", "state")
-            )
-        )
-        if not wifi:
-            self.add(
+                Sensor("state", 22, 34, "", "state"),
                 Sensor("maxPower", -1, -1, "", "today_max_current", "W", True)
             )
+        )
 
     def __len__(self):
         """Length."""
@@ -161,6 +159,7 @@ class SAJ(object):
                 current_url = self.url
                 async with session.get(current_url) as response:
                     data = await response.text()
+                    at_least_one_enabled = False
 
                     if self.wifi:
                         csv_data = StringIO(data)
@@ -177,12 +176,18 @@ class SAJ(object):
                         for sen in sensors:
                             if ncol < 24:
                                 if sen.csv_1_key != -1:
-                                    v = values[sen.csv_1_key]
+                                    try:
+                                        v = values[sen.csv_1_key]
+                                    except IndexError:
+                                        v = None
                                 else:
                                     v = None
                             else:
                                 if sen.csv_2_key != -1:
-                                    v = values[sen.csv_2_key]
+                                    try:
+                                        v = values[sen.csv_2_key]
+                                    except IndexError:
+                                        v = None
                                 else:
                                     v = None
 
@@ -194,18 +199,28 @@ class SAJ(object):
                                         "{0}{1}".format(v, sen.factor)
                                     )
                                 sen.date = date.today()
+                                sen.enabled = True
+                                at_least_one_enabled = True
                     else:
                         xml = ET.fromstring(data)
 
                         for sen in sensors:
                             find = xml.find(sen.key)
-                            if find is None:
-                                raise KeyError
-                            sen.value = find.text
-                            sen.date = date.today()
+                            if find is not None:
+                                sen.value = find.text
+                                sen.date = date.today()
+                                sen.enabled = True
+                                at_least_one_enabled = True
 
-                    _LOGGER.debug("Got new value for sensor %s: %s",
-                                  sen.name, sen.value)
+                    if not at_least_one_enabled:
+                        if self.wifi:
+                            raise csv.Error
+                        else:
+                            raise ET.ParseError
+
+                    if sen.enabled:
+                        _LOGGER.debug("Got new value for sensor %s: %s",
+                                      sen.name, sen.value)
 
                     return True
         except (aiohttp.client_exceptions.ClientConnectorError,
@@ -235,22 +250,6 @@ class SAJ(object):
             raise UnexpectedResponseException(
                 str.format("No valid XML received from {0} at {1}", self.host,
                            current_url)
-            )
-        except KeyError:
-            # XML received does not have all the required elements
-            raise UnexpectedResponseException(
-                str.format("SAJ sensor key {0} not found, inverter not " +
-                           "compatible?", sen.key)
-            )
-        except IndexError:
-            # CSV received does not have all the required elements
-            raise UnexpectedResponseException(
-                str.format(
-                    "SAJ sensor name {0} at CSV position {1} not found, " +
-                    "inverter not compatible?",
-                    sen.name,
-                    sen.csv_1_key if ncol < 24 else sen.csv_2_key
-                )
             )
 
 

@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pysaj",
-    version="0.0.14",
+    version="0.0.16",
     author="fredericvl",
     author_email="frederic.van.linthoudt@gmail.com",
     description="Library to communicate with SAJ inverters",
