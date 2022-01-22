@@ -223,7 +223,7 @@ class SAJ(object):
                                       sen.name, sen.value)
 
                     return True
-        except (aiohttp.client_exceptions.ClientConnectorError,
+        except (aiohttp.client_exceptions.ClientConnectorError, asyncio.exceptions.TimeoutError,
                 concurrent.futures._base.TimeoutError):
             # Connection to inverter not possible.
             # This can be "normal" - so warning instead of error - as SAJ
