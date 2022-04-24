@@ -9,6 +9,7 @@ setuptools.setup(
     author="fredericvl",
     author_email="frederic.van.linthoudt@gmail.com",
     description="Library to communicate with SAJ inverters",
+    install_requires=["aiohttp"],
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/fredericvl/pysaj",
